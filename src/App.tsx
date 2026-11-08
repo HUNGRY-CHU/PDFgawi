@@ -1,3 +1,4 @@
+import './site-header.css'
 import { useEffect, useRef, useState } from 'react'
 import { PDFDocument } from 'pdf-lib'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
@@ -143,19 +144,26 @@ export function App() {
 
   return (
     <>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <span className="brand"><span aria-hidden="true">✂</span> PDFgawi</span>
-          <span className="privacy"><i /> 브라우저에서 처리</span>
+      <header className="gawi-header">
+        <div>
+          <h1>PDF 가위</h1>
+          <p>PDF를 합치거나 필요한 페이지를 골라 저장하세요</p>
+        </div>
+        <div className="gawi-header-actions">
+          <nav className="gawi-nav" aria-label="가위 도구">
+            <a href="https://image.gawi.cc/">이미지 가위</a>
+            <a href="/" aria-current="page">PDF 가위</a>
+          </nav>
+          <span className="gawi-privacy">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s7-3 7-9V5l-7-3-7 3v8c0 6 7 9 7 9Z" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+            서버 전송 없음
+          </span>
         </div>
       </header>
       <main>
-        <section className="intro">
-          <p className="eyebrow">PDF WORKSPACE</p>
-          <h1>PDF 합치기와 분할</h1>
-          <p>여러 PDF를 하나로 합치거나 필요한 페이지를 골라 저장하세요.</p>
-          <p>파일은 이 브라우저 안에서만 처리됩니다.</p>
-        </section>
         <div className="workspace">
           <section className="panel files-panel" aria-labelledby="files-title">
             <h2 id="files-title"><span>01</span> 파일 추가</h2>

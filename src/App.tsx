@@ -16,10 +16,10 @@ type Source = {
   pdf: PDFDocument
 }
 
-type Mode = 'merge' | 'extract' | 'split' | 'images'
+type Mode = 'merge' | 'extract' | 'split'
 
 export function App() {
-  const [tool, setTool] = useState<'pdf' | 'images'>('pdf')
+  const [tool, setTool] = useState<'pdf' | 'images' | 'pdfToImages'>('pdf')
   const [imageResults, setImageResults] = useState<{ name: string; url: string; bytes: Uint8Array }[]>([])
   useEffect(() => () => { imageResults.forEach(({ url }) => URL.revokeObjectURL(url)) }, [imageResults])
   const input = useRef<HTMLInputElement>(null)
@@ -27,8 +27,12 @@ export function App() {
   const [files, setFiles] = useState<Source[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [page, setPage] = useState(1)
-  const [mode, setMode] = useState<Mode>('merge')
-  const [range, setRange] = useState('')
+  const [pdfMode, setMode] = useState<Mode>('merge')
+  const mode = tool === 'pdfToImages' ? 'images' : pdfMode
+  const [pdfRange, setPdfRange] = useState('')
+  const [imageRange, setImageRange] = useState('')
+  const range = tool === 'pdfToImages' ? imageRange : pdfRange
+  const setRange = tool === 'pdfToImages' ? setImageRange : setPdfRange
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -75,7 +79,8 @@ export function App() {
     setImageResults([])
     setSelectedId(id)
     setPage(1)
-    setRange('')
+    setPdfRange('')
+    setImageRange('')
     setPreview(undefined)
   }
 
@@ -202,11 +207,12 @@ export function App() {
       </header>
       <main>
         <nav className="tool-tabs" aria-label="변환 도구">
-          <button aria-pressed={tool === 'pdf'} disabled={busy} onClick={() => setTool('pdf')}>PDF 편집 · 이미지로 변환</button>
+          <button aria-pressed={tool === 'pdf'} disabled={busy} onClick={() => { setTool('pdf'); setMessage(''); setErrors([]) }}>PDF 편집</button>
           <button aria-pressed={tool === 'images'} disabled={busy} onClick={() => setTool('images')}>이미지를 PDF로</button>
+          <button aria-pressed={tool === 'pdfToImages'} disabled={busy} onClick={() => { setTool('pdfToImages'); setMessage(''); setErrors([]) }}>PDF를 이미지로</button>
         </nav>
         <div hidden={tool !== 'images'}><ImagesToPdf /></div>
-        <div hidden={tool !== 'pdf'}>
+        <div hidden={tool === 'images'}>
         <div className="workspace">
           <section className="panel files-panel" aria-labelledby="files-title">
             <h2 id="files-title"><span>01</span> 파일 추가</h2>
@@ -249,7 +255,7 @@ export function App() {
             </button>
             {files.length > 0 && (
               <>
-                <p className="list-caption">파일 {files.length}개 · 위에서부터 순서대로 병합</p>
+                <p className="list-caption">파일 {files.length}개 · {tool === 'pdfToImages' ? '파일 이름을 눌러 변환할 PDF 선택' : '위에서부터 순서대로 병합'}</p>
                 <ol className="files">
                   {files.map(({ id, file, pdf }, index) => (
                     <li key={id} className={id === selectedId ? 'selected' : ''}>
@@ -292,17 +298,17 @@ export function App() {
             ) : <div className="preview-sheet empty"><span aria-hidden="true">▤</span><p>PDF를 추가하면 여기에 표시됩니다.</p></div>}
           </section>
           <section className="panel export-panel" aria-labelledby="export-title">
-            <h2 id="export-title"><span>03</span> 파일 내보내기</h2>
+            <h2 id="export-title"><span>03</span> {tool === 'pdfToImages' ? 'PDF를 이미지로' : '파일 내보내기'}</h2>
             <fieldset disabled={busy}>
               <legend className="sr-only">내보내기 방식</legend>
-              <div className="modes">
-                {([['merge', '병합'], ['extract', '페이지 추출'], ['split', '페이지별 분할'], ['images', 'PDF → 이미지']] as const).map(([value, label]) => (
+              {tool === 'pdf' && <div className="modes">
+                {([['merge', '병합'], ['extract', '페이지 추출'], ['split', '페이지별 분할']] as const).map(([value, label]) => (
                   <label key={value}>
                     <input type="radio" name="mode" checked={mode === value} onChange={() => { setMode(value); setImageResults([]); setMessage(''); setErrors([]) }} />
                     <span>{label}</span>
                   </label>
                 ))}
-              </div>
+              </div>}
               {mode === 'merge' ? <p className="mode-description">목록에 있는 PDF를 현재 순서대로 하나의 파일로 합칩니다.</p> : (
                 <div className="range">
                   <label htmlFor="range">{mode === 'extract' ? '추출할 페이지' : mode === 'images' ? '이미지로 변환할 페이지' : '분할할 페이지'}</label>

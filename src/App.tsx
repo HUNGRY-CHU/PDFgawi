@@ -191,6 +191,11 @@ export function App() {
           <h1>PDF 가위</h1>
           <p>PDF를 합치거나 필요한 페이지를 골라 저장하세요</p>
         </div>
+        <nav className="tool-tabs" aria-label="변환 도구">
+          <button aria-pressed={tool === 'pdf'} disabled={busy} onClick={() => { setTool('pdf'); setMessage(''); setErrors([]) }}>PDF 편집</button>
+          <button aria-pressed={tool === 'images'} disabled={busy} onClick={() => setTool('images')}>이미지를 PDF로</button>
+          <button aria-pressed={tool === 'pdfToImages'} disabled={busy} onClick={() => { setTool('pdfToImages'); setMessage(''); setErrors([]) }}>PDF를 이미지로</button>
+        </nav>
         <div className="gawi-header-actions">
           <nav className="gawi-nav" aria-label="가위 도구">
             <a href="https://image.gawi.cc/">이미지 가위</a>
@@ -206,11 +211,6 @@ export function App() {
         </div>
       </header>
       <main>
-        <nav className="tool-tabs" aria-label="변환 도구">
-          <button aria-pressed={tool === 'pdf'} disabled={busy} onClick={() => { setTool('pdf'); setMessage(''); setErrors([]) }}>PDF 편집</button>
-          <button aria-pressed={tool === 'images'} disabled={busy} onClick={() => setTool('images')}>이미지를 PDF로</button>
-          <button aria-pressed={tool === 'pdfToImages'} disabled={busy} onClick={() => { setTool('pdfToImages'); setMessage(''); setErrors([]) }}>PDF를 이미지로</button>
-        </nav>
         <div hidden={tool !== 'images'}><ImagesToPdf /></div>
         <div hidden={tool === 'images'}>
         <div className="workspace">

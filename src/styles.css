@@ -69,3 +69,17 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .preview-panel { grid-column: auto; grid-row: auto; }
   .preview-sheet { min-height: 210px; }
 }
+
+[hidden] { display: none !important; }
+.tool-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.tool-tabs button { border: 1px solid var(--line); padding: 10px 14px; border-radius: 9px; background: white; color: var(--muted); font-weight: 700; }
+.tool-tabs button[aria-pressed=true] { background: var(--accent); color: white; border-color: var(--accent); }
+.image-tool { max-width: 720px; margin-inline: auto; }
+.image-tool .dropzone { margin-top: 16px; }
+.image-list li { padding: 8px; gap: 10px; cursor: grab; }
+.image-list li:active { cursor: grabbing; }
+.image-list img { width: 64px; height: 64px; object-fit: contain; background: #f1f5f9; border-radius: 5px; }
+.image-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.image-results figure { margin: 12px 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+.image-results img { display: block; max-width: 100%; max-height: 240px; margin: auto; }
+.image-results figcaption { font-size: 12px; overflow-wrap: anywhere; margin-top: 8px; }

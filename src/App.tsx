@@ -4,6 +4,7 @@ import { PDFDocument } from 'pdf-lib'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { zipSync } from 'fflate'
+import { ImagesToPdf } from './ImagesToPdf'
 import { Preview } from './Preview'
 import { download, extractPages, mergePdfs, parsePageGroups, parsePages } from './pdf'
 
@@ -15,9 +16,12 @@ type Source = {
   pdf: PDFDocument
 }
 
-type Mode = 'merge' | 'extract' | 'split'
+type Mode = 'merge' | 'extract' | 'split' | 'images'
 
 export function App() {
+  const [tool, setTool] = useState<'pdf' | 'images'>('pdf')
+  const [imageResults, setImageResults] = useState<{ name: string; url: string; bytes: Uint8Array }[]>([])
+  useEffect(() => () => { imageResults.forEach(({ url }) => URL.revokeObjectURL(url)) }, [imageResults])
   const input = useRef<HTMLInputElement>(null)
   const dragDepth = useRef(0)
   const [files, setFiles] = useState<Source[]>([])
@@ -68,6 +72,7 @@ export function App() {
 
   function select(id: string) {
     if (id === selectedId) return
+    setImageResults([])
     setSelectedId(id)
     setPage(1)
     setRange('')
@@ -121,7 +126,36 @@ export function App() {
         download(await mergePdfs(files.map(({ pdf }) => pdf)), 'pdfgawi-merged.pdf', 'application/pdf')
       } else {
         const name = selected.file.name.replace(/\.pdf$/i, '')
-        if (mode === 'extract') {
+        if (mode === 'images') {
+          const pages = range.trim() ? parsePages(range, pageCount) : selected.pdf.getPageIndices()
+          const assetRoot = new URL(import.meta.env.BASE_URL + 'pdfjs/', location.href)
+          const loading = getDocument({ data: await selected.file.arrayBuffer(),
+            cMapUrl: new URL('cmaps/', assetRoot).href, cMapPacked: true,
+            standardFontDataUrl: new URL('standard_fonts/', assetRoot).href,
+            wasmUrl: new URL('wasm/', assetRoot).href })
+          const results: typeof imageResults = []
+          try {
+            const pdf = await loading.promise
+            for (const index of pages) {
+              const pdfPage = await pdf.getPage(index + 1)
+              const natural = pdfPage.getViewport({ scale: 1 })
+              const viewport = pdfPage.getViewport({ scale: Math.min(2, 4096 / Math.max(natural.width, natural.height)) })
+              const canvas = document.createElement('canvas')
+              canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height)
+              try {
+                await pdfPage.render({ canvas, viewport, background: '#ffffff' }).promise
+                const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
+                  (value) => value ? resolve(value) : reject(new Error('이미지 변환에 실패했습니다.')), 'image/png'))
+                results.push({ name: name + '-page-' + (index + 1) + '.png',
+                  bytes: new Uint8Array(await blob.arrayBuffer()), url: URL.createObjectURL(blob) })
+              } finally { canvas.width = canvas.height = 0; pdfPage.cleanup() }
+            }
+            setImageResults(results)
+          } catch (error) {
+            results.forEach(({ url }) => URL.revokeObjectURL(url))
+            throw error
+          } finally { await loading.destroy() }
+        } else if (mode === 'extract') {
           const pages = parsePages(range, pageCount)
           download(await extractPages(selected.pdf, pages), name + '-extracted.pdf', 'application/pdf')
         } else {
@@ -137,7 +171,7 @@ export function App() {
           download(zipSync(entries, { level: 0 }), name + '-split.zip', 'application/zip')
         }
       }
-      setMessage('다운로드를 시작했습니다.')
+      setMessage(mode === 'images' ? '이미지 변환이 완료되었습니다. 아래에서 다운로드하세요.' : '다운로드를 시작했습니다.')
     } catch (error) {
       setErrors([error instanceof Error ? error.message : '파일을 만드는 중 오류가 발생했습니다.'])
     } finally {
@@ -167,6 +201,12 @@ export function App() {
         </div>
       </header>
       <main>
+        <nav className="tool-tabs" aria-label="변환 도구">
+          <button aria-pressed={tool === 'pdf'} disabled={busy} onClick={() => setTool('pdf')}>PDF 편집 · 이미지로 변환</button>
+          <button aria-pressed={tool === 'images'} disabled={busy} onClick={() => setTool('images')}>이미지를 PDF로</button>
+        </nav>
+        <div hidden={tool !== 'images'}><ImagesToPdf /></div>
+        <div hidden={tool !== 'pdf'}>
         <div className="workspace">
           <section className="panel files-panel" aria-labelledby="files-title">
             <h2 id="files-title"><span>01</span> 파일 추가</h2>
@@ -256,31 +296,41 @@ export function App() {
             <fieldset disabled={busy}>
               <legend className="sr-only">내보내기 방식</legend>
               <div className="modes">
-                {([['merge', '병합'], ['extract', '페이지 추출'], ['split', '페이지별 분할']] as const).map(([value, label]) => (
+                {([['merge', '병합'], ['extract', '페이지 추출'], ['split', '페이지별 분할'], ['images', 'PDF → 이미지']] as const).map(([value, label]) => (
                   <label key={value}>
-                    <input type="radio" name="mode" checked={mode === value} onChange={() => setMode(value)} />
+                    <input type="radio" name="mode" checked={mode === value} onChange={() => { setMode(value); setImageResults([]); setMessage(''); setErrors([]) }} />
                     <span>{label}</span>
                   </label>
                 ))}
               </div>
               {mode === 'merge' ? <p className="mode-description">목록에 있는 PDF를 현재 순서대로 하나의 파일로 합칩니다.</p> : (
                 <div className="range">
-                  <label htmlFor="range">{mode === 'extract' ? '추출할 페이지' : '분할할 페이지'}</label>
+                  <label htmlFor="range">{mode === 'extract' ? '추출할 페이지' : mode === 'images' ? '이미지로 변환할 페이지' : '분할할 페이지'}</label>
                   <input id="range" type="text" value={range} onChange={(event) => setRange(event.target.value)}
                     aria-describedby="range-help" placeholder="예시  1, 3-5 또는 3~5" autoComplete="off" />
                   <p id="range-help">{mode === 'extract'
                     ? '선택한 PDF에서 지정한 페이지를 입력 순서대로 하나의 PDF에 담습니다.'
+                    : mode === 'images' ? '지정한 페이지를 각각 PNG 이미지로 변환합니다. 비워 두면 전체 페이지를 변환합니다.'
                     : '쉼표로 구분한 항목마다 PDF를 만들어 ZIP에 담습니다. 예: 1, 3~5 → 1페이지 PDF와 3~5페이지 PDF. 비워 두면 한 페이지씩 분할합니다.'}</p>
                 </div>
               )}
               <button className="download" disabled={!selected || (mode === 'merge' && files.length < 2) || (mode === 'extract' && !range.trim())}
                 onClick={() => void exportPdf()}>
-                {busy ? '처리 중…' : mode === 'split' ? 'ZIP 다운로드 ↓' : 'PDF 다운로드 ↓'}
+                {busy ? '처리 중…' : mode === 'images' ? '이미지로 변환' : mode === 'split' ? 'ZIP 다운로드 ↓' : 'PDF 다운로드 ↓'}
               </button>
             </fieldset>
+            {mode === 'images' && imageResults.length > 0 && <section className="image-results" aria-label="변환된 이미지">
+              <button className="download" disabled={busy} onClick={() => {
+                download(zipSync(Object.fromEntries(imageResults.map(({ name, bytes }) => [name, bytes])), { level: 0 }), 'pdfgawi-images.zip', 'application/zip')
+              }}>이미지 ZIP 다운로드 ↓</button>
+              {imageResults.map(({ name, url }) => <figure key={name}>
+                <img src={url} alt={name} /><figcaption><a href={url} download={name}>{name} 다운로드</a></figcaption>
+              </figure>)}
+            </section>}
             {errors.length > 0 && <ul className="errors" role="alert">{errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}
             <p className="message" role="status">{message}</p>
           </section>
+        </div>
         </div>
       </main>
     </>

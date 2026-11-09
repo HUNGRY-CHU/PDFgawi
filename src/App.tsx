@@ -5,7 +5,7 @@ import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-d
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { zipSync } from 'fflate'
 import { Preview } from './Preview'
-import { download, extractPages, mergePdfs, parsePages } from './pdf'
+import { download, extractPages, mergePdfs, parsePageGroups, parsePages } from './pdf'
 
 GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -125,11 +125,14 @@ export function App() {
           const pages = parsePages(range, pageCount)
           download(await extractPages(selected.pdf, pages), name + '-extracted.pdf', 'application/pdf')
         } else {
-          const pages = range.trim() ? parsePages(range, pageCount) : selected.pdf.getPageIndices()
+          const groups = parsePageGroups(range, pageCount)
           const entries = Object.create(null) as Record<string, Uint8Array>
-          for (const index of pages) {
-            const pageLabel = String(index + 1).padStart(String(pageCount).length, '0')
-            entries['page-' + pageLabel + '.pdf'] = await extractPages(selected.pdf, [index])
+          for (const pages of groups) {
+            const label = (index: number) => String(index + 1).padStart(String(pageCount).length, '0')
+            const pageLabel = pages.length === 1
+              ? label(pages[0])
+              : label(pages[0]) + '-' + label(pages[pages.length - 1])
+            entries['page-' + pageLabel + '.pdf'] = await extractPages(selected.pdf, pages)
           }
           download(zipSync(entries, { level: 0 }), name + '-split.zip', 'application/zip')
         }
@@ -264,10 +267,10 @@ export function App() {
                 <div className="range">
                   <label htmlFor="range">{mode === 'extract' ? '추출할 페이지' : '분할할 페이지'}</label>
                   <input id="range" type="text" value={range} onChange={(event) => setRange(event.target.value)}
-                    aria-describedby="range-help" placeholder="예시  1, 3-5" autoComplete="off" />
+                    aria-describedby="range-help" placeholder="예시  1, 3-5 또는 3~5" autoComplete="off" />
                   <p id="range-help">{mode === 'extract'
                     ? '선택한 PDF에서 지정한 페이지를 입력 순서대로 하나의 PDF에 담습니다.'
-                    : '페이지마다 PDF를 만들어 ZIP에 담습니다. 비워 두면 전체 페이지를 분할합니다.'}</p>
+                    : '쉼표로 구분한 항목마다 PDF를 만들어 ZIP에 담습니다. 예: 1, 3~5 → 1페이지 PDF와 3~5페이지 PDF. 비워 두면 한 페이지씩 분할합니다.'}</p>
                 </div>
               )}
               <button className="download" disabled={!selected || (mode === 'merge' && files.length < 2) || (mode === 'extract' && !range.trim())}

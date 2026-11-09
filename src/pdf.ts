@@ -3,8 +3,8 @@ import { PDFDocument } from 'pdf-lib'
 export function parsePages(input: string, pageCount: number): number[] {
   const pages = new Set<number>()
   for (const part of input.split(',')) {
-    const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(part.trim())
-    if (!match) throw new Error('페이지를 1, 3-5 같은 형식으로 입력하세요.')
+    const match = /^(\d+)(?:\s*[-~]\s*(\d+))?$/.exec(part.trim())
+    if (!match) throw new Error('페이지를 1, 3-5 또는 3~5 같은 형식으로 입력하세요.')
 
     const first = Number(match[1])
     const last = Number(match[2] ?? match[1])
@@ -14,6 +14,11 @@ export function parsePages(input: string, pageCount: number): number[] {
     for (let page = first; page <= last; page++) pages.add(page - 1)
   }
   return [...pages]
+}
+
+export function parsePageGroups(input: string, pageCount: number): number[][] {
+  if (!input.trim()) return Array.from({ length: pageCount }, (_, index) => [index])
+  return input.split(',').map((part) => parsePages(part, pageCount))
 }
 
 export async function mergePdfs(sources: PDFDocument[]) {
